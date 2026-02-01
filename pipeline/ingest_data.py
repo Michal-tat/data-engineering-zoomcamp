@@ -2,6 +2,7 @@ import click
 import pandas as pd
 from sqlalchemy import create_engine
 from tqdm.auto import tqdm
+import os
 
 @click.command()
 @click.option('--pg-user', default='root', help='PostgreSQL user')
@@ -19,7 +20,8 @@ def run(pg_user, pg_pass, pg_host, pg_port, pg_db, year, month, target_table, ch
     month_str = f"{month:02d}"
     
     # Adres URL z użyciem parametrów
-    url = f'https://github.com/DataTalksClub/nyc-tlc-data/releases/download/yellow/yellow_tripdata_{year}-{month_str}.csv.gz'
+    yellow_taxi_url = f'https://github.com/DataTalksClub/nyc-tlc-data/releases/download/yellow/yellow_tripdata_{year}-{month_str}.csv.gz'
+    zones_url = f'https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv'
 
     # Definicja typów danych
     dtype = {
@@ -37,12 +39,19 @@ def run(pg_user, pg_pass, pg_host, pg_port, pg_db, year, month, target_table, ch
 
     # 4. Przygotowanie iteratora
     df_iter = pd.read_csv(
-        url,
+        yellow_taxi_url,
         dtype=dtype,
         parse_dates=parse_dates,
         iterator=True,
         chunksize=chunksize
     )
+
+    #importowanie zone lookup
+    print(f'Downloading zone data from {zones_url}...')
+    zone_lookup = pd.read_csv(zones_url) # Pandas pobierze to sam!
+    zone_lookup.columns = [c.lower() for c in zone_lookup.columns]
+    zone_lookup.to_sql(name='zones', con=engine, if_exists='replace') # Nazwa tabeli 'zones' zamiast 'zones.csv'
+    print('Inserted zone data successfully')
 
     # 5. Pierwsza paczka i schemat
     df = next(df_iter)
