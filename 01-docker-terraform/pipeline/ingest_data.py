@@ -2,7 +2,6 @@ import click
 import pandas as pd
 from sqlalchemy import create_engine
 from tqdm.auto import tqdm
-import os
 
 @click.command()
 @click.option('--pg-user', default='root', help='PostgreSQL user')
@@ -16,14 +15,14 @@ import os
 @click.option('--chunksize', default=100000, type=int, help='Chunk size for reading CSV')
 def run(pg_user, pg_pass, pg_host, pg_port, pg_db, year, month, target_table, chunksize):
     
-    # Formatujemy miesiąc, aby zawsze miał dwie cyfry (np. 1 -> "01", 10 -> "10")
+    # Format month to always have two digits (e.g., 1 -> "01", 10 -> "10")
     month_str = f"{month:02d}"
     
-    # Adres URL z użyciem parametrów
+    # URL address using parameters
     yellow_taxi_url = f'https://github.com/DataTalksClub/nyc-tlc-data/releases/download/yellow/yellow_tripdata_{year}-{month_str}.csv.gz'
     zones_url = f'https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv'
 
-    # Definicja typów danych
+    # Define data types
     dtype = {
         "VendorID": "Int64", "passenger_count": "Int64", "trip_distance": "float64",
         "RatecodeID": "Int64", "store_and_fwd_flag": "string", "PULocationID": "Int64",
@@ -34,10 +33,10 @@ def run(pg_user, pg_pass, pg_host, pg_port, pg_db, year, month, target_table, ch
     }
     parse_dates = ["tpep_pickup_datetime", "tpep_dropoff_datetime"]
 
-    # 3. Tworzenie połączenia - używamy zmiennych z argumentów funkcji!
+    # Create connection using function arguments
     engine = create_engine(f'postgresql://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{pg_db}')
 
-    # 4. Przygotowanie iteratora
+    # Prepare iterator
     df_iter = pd.read_csv(
         yellow_taxi_url,
         dtype=dtype,
@@ -46,25 +45,25 @@ def run(pg_user, pg_pass, pg_host, pg_port, pg_db, year, month, target_table, ch
         chunksize=chunksize
     )
 
-    #importowanie zone lookup
+    # Import zone lookup
     print(f'Downloading zone data from {zones_url}...')
-    zone_lookup = pd.read_csv(zones_url) # Pandas pobierze to sam!
+    zone_lookup = pd.read_csv(zones_url)
     zone_lookup.columns = [c.lower() for c in zone_lookup.columns]
-    zone_lookup.to_sql(name='zones', con=engine, if_exists='replace') # Nazwa tabeli 'zones' zamiast 'zones.csv'
+    zone_lookup.to_sql(name='zones', con=engine, if_exists='replace')
     print('Inserted zone data successfully')
 
-    # 5. Pierwsza paczka i schemat
+    # First batch and schema
     df = next(df_iter)
     df.head(n=0).to_sql(name=target_table, con=engine, if_exists='replace')
 
-    # 6. Pętla ładująca
-    print(f"Ładowanie danych do tabeli {target_table} na host {pg_host}...")
+    # Loading loop
+    print(f"Loading data to table {target_table} on host {pg_host}...")
     df.to_sql(name=target_table, con=engine, if_exists='append')
 
     for df_chunk in tqdm(df_iter):
         df_chunk.to_sql(name=target_table, con=engine, if_exists='append')
     
-    print("Zakończono sukcesem!")
+    print("Completed successfully!")
 
 if __name__ == '__main__':
     run()
