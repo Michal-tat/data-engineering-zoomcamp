@@ -1,4 +1,6 @@
+# Added by me
 *.parquet
+*.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
