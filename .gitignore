@@ -1,6 +1,12 @@
 # Added by me
 *.parquet
 *.vscode
+.env
+*.env
+.env*
+.env_encoded
+*.env_encoded
+.env_encoded*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
